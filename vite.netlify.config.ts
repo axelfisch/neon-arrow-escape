@@ -21,5 +21,10 @@ export default defineConfig({
     outDir: path.join(dir, "site"),
     emptyOutDir: true,
     sourcemap: false,
+    cssMinify: true,
+  },
+  // Follow @/ imports outside spa/ so Tailwind sees every class.
+  server: {
+    fs: { allow: [dir] },
   },
 });

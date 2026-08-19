@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Netlify SPA build uses spa/ as Vite root — scan the real UI tree. */
+@source "./**/*.{ts,tsx}";
+@source "../spa/**/*.{tsx,html}";
+
 @theme {
   --color-bg: #070b16;
   --color-surface: #0e1528;

@@ -31,12 +31,14 @@ export function Shell({
           wide ? "max-w-5xl" : "max-w-lg",
         )}
       >
-        <header className="mb-6 flex items-center justify-between gap-3">
-          <Link to="/" className="font-display text-sm font-semibold tracking-[0.18em] text-accent">
-            <span className="sm:hidden">NA</span>
-            <span className="hidden sm:inline">{t(lang, "title")}</span>
+        <header className="mb-6 flex flex-nowrap items-center justify-between gap-3">
+          <Link
+            to="/"
+            className="font-display shrink-0 text-sm font-semibold tracking-[0.16em] text-accent"
+          >
+            NEON ARROW
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               aria-label={t(lang, "sound")}

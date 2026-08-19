@@ -2,6 +2,9 @@ import { DEFAULT_PROGRESS, type Progress } from "./types";
 
 const KEY = "neon-arrow-escape-v1";
 
+/** Featured gauntlets — always playable so the 100/150/180 défis are reachable. */
+export const FEATURED_UNLOCK = new Set([67, 68, 73, 74, 80]);
+
 function migrate(raw: Partial<Progress> | null): Progress {
   const base = { ...DEFAULT_PROGRESS };
   if (!raw || typeof raw !== "object") return base;
@@ -67,6 +70,7 @@ export function mergeProgress(a: Progress, b: Progress): Progress {
 
 export function isUnlocked(id: number, completed: number[]): boolean {
   if (id <= 8) return true;
+  if (FEATURED_UNLOCK.has(id)) return true;
   return completed.includes(id) || completed.includes(id - 1);
 }
 

@@ -5,7 +5,7 @@ import { Shell } from "@/components/game/Shell";
 import { getLevels, TIER_META } from "@/game/catalog";
 import { useProgress } from "@/game/progress-store";
 import { t } from "@/game/i18n";
-import { isUnlocked } from "@/game/save";
+import { FEATURED_UNLOCK, isUnlocked } from "@/game/save";
 import { TIER_ORDER } from "@/game/types";
 import { cn } from "@/lib/cn";
 
@@ -47,17 +47,9 @@ export function LevelsPage() {
                 const open = isUnlocked(lv.id, progress.completed);
                 const done = progress.completed.includes(lv.id);
                 const stars = progress.stars[String(lv.id)] ?? 0;
-                return open ? (
-                  <Link
-                    key={lv.id}
-                    to="/play/$levelId"
-                    params={{ levelId: String(lv.id) }}
-                    className={cn(
-                      "relative flex aspect-square flex-col items-center justify-center rounded-xl border text-sm font-medium transition-colors",
-                      done && "border-accent/30 bg-accent/8 text-accent",
-                      !done && "border-border bg-surface text-fg hover:border-accent/40",
-                    )}
-                  >
+                const featured = FEATURED_UNLOCK.has(lv.id);
+                const inner = (
+                  <>
                     <span className="font-mono text-sm tabular-nums">{lv.id}</span>
                     {done && (
                       <span className="mt-0.5 flex gap-0.5">
@@ -72,14 +64,35 @@ export function LevelsPage() {
                     {lv.arrowCount >= 100 && (
                       <span className="absolute top-1 right-1 size-1.5 rounded-full bg-danger" />
                     )}
+                    {!open && <Lock className="absolute bottom-1 right-1 size-2.5 text-faint" />}
+                    {featured && !done && (
+                      <span className="absolute bottom-1 left-1 font-mono text-[8px] tracking-wide text-danger">
+                        {lv.arrowCount}
+                      </span>
+                    )}
+                  </>
+                );
+                return open ? (
+                  <Link
+                    key={lv.id}
+                    to="/play/$levelId"
+                    params={{ levelId: String(lv.id) }}
+                    className={cn(
+                      "relative flex aspect-square flex-col items-center justify-center rounded-xl border text-sm font-medium transition-colors",
+                      done && "border-accent/30 bg-accent/8 text-accent",
+                      !done && featured && "border-danger/35 bg-danger/8 text-fg hover:border-danger/60",
+                      !done && !featured && "border-border bg-surface text-fg hover:border-accent/40",
+                    )}
+                  >
+                    {inner}
                   </Link>
                 ) : (
                   <div
                     key={lv.id}
                     className="relative flex aspect-square flex-col items-center justify-center rounded-xl border border-border/60 bg-surface/40 text-faint"
-                    aria-label={t(lang, "locked")}
+                    aria-label={`${t(lang, "locked")} ${lv.id}`}
                   >
-                    <Lock className="size-3.5" />
+                    {inner}
                   </div>
                 );
               })}
