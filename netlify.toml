@@ -1,0 +1,12 @@
+# Neon Arrow — Netlify
+# Prefers the prebuilt static site/ folder so deploys work even if
+# the Netlify build image cannot compile the app.
+[build]
+  publish = "site"
+  command = "npm run build:netlify"
+  environment = { NODE_VERSION = "22" }
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

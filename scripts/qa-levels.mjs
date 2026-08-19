@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch({ args: ["--no-sandbox"] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page.on("console", (m) => console.log("CONSOLE", m.type(), m.text()));
+page.on("pageerror", (e) => console.log("PAGEERROR", e.message));
+await page.goto("http://127.0.0.1:8080/levels", { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+const locks = await page.locator("svg.lucide-lock").count();
+const links = await page.locator("a[href^='/play/']").count();
+const storage = await page.evaluate(() => localStorage.getItem("neon-arrow-escape-v1"));
+console.log({ locks, links, storage });
+await page.screenshot({ path: "/workspace/screenshots/levels-client.png", fullPage: true });
+await browser.close();
