@@ -1,12 +1,26 @@
 # Neon Arrow — Netlify
-# Prefers the prebuilt static site/ folder so deploys work even if
-# the Netlify build image cannot compile the app.
+# The folder site/ is a finished static build. No compile is required.
+# If this repo is connected to Netlify, every push publishes site/.
+
 [build]
   publish = "site"
-  command = "npm run build:netlify"
+  command = "echo using-prebuilt-site"
   environment = { NODE_VERSION = "22" }
+
+[build.processing]
+  skip_processing = false
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

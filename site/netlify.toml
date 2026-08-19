@@ -1,3 +1,6 @@
+# Drop this folder (or the zip of this folder) onto Netlify.
+# No build command. Publish directory = this folder.
+
 [build]
   publish = "."
   command = ""
@@ -6,3 +9,8 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
