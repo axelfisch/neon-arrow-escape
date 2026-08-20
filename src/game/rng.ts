@@ -37,3 +37,14 @@ export function pickN<T>(rng: () => number, arr: readonly T[], n: number): T[] {
   }
   return copy.slice(0, n);
 }
+
+export function shuffle<T>(rng: () => number, arr: readonly T[]): T[] {
+  const copy = arr.slice() as T[];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = copy[i]!;
+    copy[i] = copy[j]!;
+    copy[j] = tmp;
+  }
+  return copy;
+}

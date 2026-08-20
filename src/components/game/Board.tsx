@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { Dir, Piece } from "@/game/types";
 import { PIECE_COLORS } from "@/game/types";
-import { canRemove, pathPreview, pieceAt } from "@/game/engine";
+import { canRemove, headCell, pathPreview, pieceAt, tailCell } from "@/game/engine";
 import { cn } from "@/lib/cn";
 
 function arrowHead(x: number, y: number, dir: Dir, s: number) {
@@ -117,8 +117,8 @@ export function Board({
         {pieces.map((p) => {
           const free = canRemove(p, pieces, w, h);
           const col = PIECE_COLORS[p.color % PIECE_COLORS.length]!;
-          const head = p.path[p.path.length - 1]!;
-          const tail = p.path[0]!;
+          const head = headCell(p);
+          const tail = tailCell(p);
           const hx = head.c + 0.5;
           const hy = head.r + 0.5;
           const multi = p.path.length > 1;
@@ -168,7 +168,7 @@ export function Board({
               ) : (
                 <circle cx={hx} cy={hy} r={lw * 0.55} fill={col} opacity={free ? 0.95 : 0.72} />
               )}
-              <circle cx={tail.c + 0.5} cy={tail.r + 0.5} r={0.07} fill={col} opacity={0.55} />
+              {multi && <circle cx={tail.c + 0.5} cy={tail.r + 0.5} r={0.07} fill={col} opacity={0.55} />}
               <polygon
                 points={arrowHead(hx, hy, p.dir, as)}
                 fill={col}

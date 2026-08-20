@@ -94,20 +94,23 @@ export function Home() {
 
         <div className="mt-4 grid w-full grid-cols-3 gap-2">
           {[
-            { id: 67, n: 100, label: lang === "fr" ? "Centurie" : "Century" },
-            { id: 73, n: 150, label: lang === "fr" ? "Hécatombe" : "Hecatomb" },
-            { id: 80, n: 180, label: "Néant" },
-          ].map((g) => (
+            { id: 67, label: lang === "fr" ? "Centurie" : "Century" },
+            { id: 73, label: lang === "fr" ? "Hécatombe" : "Hecatomb" },
+            { id: 80, label: "Néant" },
+          ].map((g) => {
+            const n = levels.find((l) => l.id === g.id)?.arrowCount ?? g.id;
+            return (
             <Link
               key={g.id}
               to="/play/$levelId"
               params={{ levelId: String(g.id) }}
               className="rounded-2xl border border-danger/30 bg-danger/6 px-3 py-3 text-center hover:border-danger/55"
             >
-              <p className="font-mono text-[10px] tracking-wider text-danger">{g.n}</p>
+              <p className="font-mono text-[10px] tracking-wider text-danger">{n}</p>
               <p className="mt-1 font-display text-xs font-semibold">{g.label}</p>
             </Link>
-          ))}
+            );
+          })}
         </div>
 
         <HowToPanel lang={lang} />

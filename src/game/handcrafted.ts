@@ -1,5 +1,5 @@
 import type { Dir, LevelDef, Piece } from "./types";
-import { scoreDifficulty, solveGreedy, verifySolution } from "./engine";
+import { scoreDifficulty, solveAny, solveGreedy, verifySolution } from "./engine";
 
 type Raw = {
   w: number;
@@ -24,7 +24,7 @@ function pack(
     color: p.color,
   }));
   const greedy = solveGreedy(pieces, raw.w, raw.h);
-  const solution = greedy ?? pieces.map((p) => p.id);
+  const solution = greedy ?? solveAny(pieces, raw.w, raw.h) ?? pieces.map((p) => p.id);
   if (greedy && !verifySolution(pieces, solution, raw.w, raw.h)) {
     /* still ship — generator verifies later */
   }
@@ -103,7 +103,7 @@ export const HANDCRAFTED: LevelDef[] = [
       { path: [{ c: 0, r: 4 }, { c: 1, r: 4 }, { c: 2, r: 4 }, { c: 3, r: 4 }, { c: 4, r: 4 }], dir: "right", color: 2 },
       { path: [{ c: 3, r: 2 }, { c: 4, r: 2 }, { c: 4, r: 3 }], dir: "down", color: 3 },
       { path: [{ c: 0, r: 2 }, { c: 0, r: 3 }], dir: "down", color: 4 },
-      { path: [{ c: 5, r: 4 }], dir: "left", color: 5 },
+      { path: [{ c: 5, r: 4 }], dir: "right", color: 5 },
     ],
   }, 2, 2),
   pack(6, "Nested", "Imbriqué", "easy", {
@@ -115,7 +115,7 @@ export const HANDCRAFTED: LevelDef[] = [
       { path: [{ c: 3, r: 2 }, { c: 4, r: 2 }, { c: 4, r: 3 }], dir: "down", color: 3 },
       { path: [{ c: 0, r: 5 }, { c: 1, r: 5 }, { c: 2, r: 5 }], dir: "right", color: 4 },
       { path: [{ c: 3, r: 5 }, { c: 4, r: 5 }, { c: 5, r: 5 }], dir: "right", color: 5 },
-      { path: [{ c: 5, r: 4 }], dir: "up", color: 6 },
+      { path: [{ c: 5, r: 4 }], dir: "right", color: 6 },
     ],
   }, 2, 2),
   pack(7, "Backflow", "Contre-courant", "easy", {
@@ -139,7 +139,7 @@ export const HANDCRAFTED: LevelDef[] = [
       { path: [{ c: 4, r: 2 }, { c: 5, r: 2 }, { c: 5, r: 3 }, { c: 5, r: 4 }], dir: "down", color: 3 },
       { path: [{ c: 0, r: 5 }, { c: 1, r: 5 }, { c: 2, r: 5 }, { c: 3, r: 5 }], dir: "right", color: 4 },
       { path: [{ c: 4, r: 5 }, { c: 5, r: 5 }, { c: 6, r: 5 }], dir: "right", color: 5 },
-      { path: [{ c: 6, r: 4 }], dir: "up", color: 6 },
+      { path: [{ c: 6, r: 4 }], dir: "right", color: 6 },
     ],
   }, 2, 2),
 ];

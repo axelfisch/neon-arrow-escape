@@ -39,6 +39,28 @@ export function exitFace(piece: Piece): Cell[] {
   }
 }
 
+/** Visual + logic head: unique cell farthest in the escape direction. */
+export function headCell(piece: Piece): Cell {
+  const face = exitFace(piece);
+  if (face.length === 1) return face[0]!;
+  if (face.length > 1) return face[0]!;
+  return piece.path[0]!;
+}
+
+export function tailCell(piece: Piece): Cell {
+  const head = headCell(piece);
+  let best = piece.path[0]!;
+  let bd = -1;
+  for (const c of piece.path) {
+    const d = Math.abs(c.c - head.c) + Math.abs(c.r - head.r);
+    if (d >= bd) {
+      bd = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
 export function walkRay(
   start: Cell,
   dir: Dir,
@@ -123,6 +145,27 @@ export function solveGreedy(pieces: Piece[], w: number, h: number): string[] | n
     );
   }
   return order;
+}
+
+/** Full backtracking solver — used for small handcrafted boards. */
+export function solveAny(pieces: Piece[], w: number, h: number): string[] | null {
+  const remaining = pieces.slice();
+  const order: string[] = [];
+  const dfs = (): boolean => {
+    if (!remaining.length) return true;
+    const free = remaining.filter((p) => canRemove(p, remaining, w, h));
+    if (!free.length) return false;
+    for (const pick of free) {
+      const i = remaining.findIndex((p) => p.id === pick.id);
+      remaining.splice(i, 1);
+      order.push(pick.id);
+      if (dfs()) return true;
+      order.pop();
+      remaining.splice(i, 0, pick);
+    }
+    return false;
+  };
+  return dfs() ? order : null;
 }
 
 export function countTurns(path: Cell[]): number {
