@@ -1,10 +1,9 @@
 # Neon Arrow — Netlify
-# The folder site/ is a finished static build. No compile is required.
-# If this repo is connected to Netlify, every push publishes site/.
+# Rebuild from source on each deploy so fixes reach the published app.
 
 [build]
   publish = "site"
-  command = "echo using-prebuilt-site"
+  command = "npm run build:netlify"
   environment = { NODE_VERSION = "22" }
 
 [build.processing]

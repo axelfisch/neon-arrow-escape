@@ -1,10 +1,4 @@
-import {
-  type Cell,
-  type Dir,
-  type Piece,
-  DELTA,
-  cellKey,
-} from "./types";
+import { type Cell, type Dir, type Piece, DELTA, cellKey } from "./types";
 
 export function occupancy(pieces: Piece[], exceptId?: string): Set<string> {
   const occ = new Set<string>();
@@ -15,50 +9,17 @@ export function occupancy(pieces: Piece[], exceptId?: string): Set<string> {
   return occ;
 }
 
+/** All paths use a canonical head-to-tail order, including curved arrows. */
 export function exitFace(piece: Piece): Cell[] {
-  if (piece.path.length === 0) return [];
-  const cs = piece.path.map((c) => c.c);
-  const rs = piece.path.map((c) => c.r);
-  switch (piece.dir) {
-    case "right": {
-      const mx = Math.max(...cs);
-      return piece.path.filter((c) => c.c === mx);
-    }
-    case "left": {
-      const mn = Math.min(...cs);
-      return piece.path.filter((c) => c.c === mn);
-    }
-    case "down": {
-      const mx = Math.max(...rs);
-      return piece.path.filter((c) => c.r === mx);
-    }
-    case "up": {
-      const mn = Math.min(...rs);
-      return piece.path.filter((c) => c.r === mn);
-    }
-  }
+  return piece.path.length ? [piece.path[0]!] : [];
 }
 
-/** Visual + logic head: unique cell farthest in the escape direction. */
 export function headCell(piece: Piece): Cell {
-  const face = exitFace(piece);
-  if (face.length === 1) return face[0]!;
-  if (face.length > 1) return face[0]!;
   return piece.path[0]!;
 }
 
 export function tailCell(piece: Piece): Cell {
-  const head = headCell(piece);
-  let best = piece.path[0]!;
-  let bd = -1;
-  for (const c of piece.path) {
-    const d = Math.abs(c.c - head.c) + Math.abs(c.r - head.r);
-    if (d >= bd) {
-      bd = d;
-      best = c;
-    }
-  }
-  return best;
+  return piece.path[piece.path.length - 1]!;
 }
 
 export function walkRay(
@@ -82,7 +43,7 @@ export function walkRay(
 }
 
 export function canRemove(piece: Piece, all: Piece[], w: number, h: number): boolean {
-  const occ = occupancy(all, piece.id);
+  const occ = occupancy(all);
   const face = exitFace(piece);
   if (face.length === 0) return false;
   for (const e of face) {
@@ -93,7 +54,7 @@ export function canRemove(piece: Piece, all: Piece[], w: number, h: number): boo
 }
 
 export function pathPreview(piece: Piece, all: Piece[], w: number, h: number) {
-  const occ = occupancy(all, piece.id);
+  const occ = occupancy(all);
   const face = exitFace(piece);
   const rays: { from: Cell; cells: Cell[]; blocked: Cell | null }[] = [];
   let clear = true;
@@ -114,12 +75,7 @@ export function pieceAt(pieces: Piece[], c: number, r: number): Piece | undefine
   return pieces.find((p) => p.path.some((cell) => cellKey(cell.c, cell.r) === k));
 }
 
-export function verifySolution(
-  pieces: Piece[],
-  solution: string[],
-  w: number,
-  h: number,
-): boolean {
+export function verifySolution(pieces: Piece[], solution: string[], w: number, h: number): boolean {
   const remaining = pieces.map((p) => p);
   for (const id of solution) {
     const p = remaining.find((x) => x.id === id);
@@ -209,8 +165,7 @@ export function scoreDifficulty(input: {
   }
   const cells = pieces.reduce((n, p) => n + p.path.length, 0);
   const density = cells / (w * h);
-  const avgTurns =
-    pieces.reduce((n, p) => n + countTurns(p.path), 0) / Math.max(1, pieces.length);
+  const avgTurns = pieces.reduce((n, p) => n + countTurns(p.path), 0) / Math.max(1, pieces.length);
   const avgLen = cells / Math.max(1, pieces.length);
   const avgBranch = branchSum / Math.max(1, steps);
 

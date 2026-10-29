@@ -1,63 +1,34 @@
-# Neon Arrow
+# Neon Arrow — Rubans
 
-Escape puzzle — 80 levels, reverse generation, 100- and 150-arrow gauntlets.
+Puzzle d'évasion en TypeScript/React : 80 niveaux, flèches courbes qui se déroulent, départs successifs, défi quotidien et mode infini.
 
-**Repo:** [axelfisch/neon-arrow-escape](https://github.com/axelfisch/neon-arrow-escape)
+- Tap : lancer. Maintenir : inspecter sans perdre de vie.
+- Glisser : déplacer la vue agrandie. Pincer : zoomer.
+- Boutons de zoom et de recentrage ; option d'aperçu avant tap facultative.
+- Clavier : Tab pour choisir une flèche, Entrée/Espace pour lancer, I pour inspecter.
+- 21 géométries complexes adaptées de Arrow Escape par Umang (MIT), aux niveaux 1–20 et 63.
 
-Play locally: `npm install` then `npm run dev`.
+La progression reste locale au navigateur. Le parcours est résoluble, mais l'équilibrage ressenti de la nouvelle sélection reste à tester sur téléphone.
 
-## What’s in this version
+## Développement
 
-| Range | Tier | Notes |
-| --- | --- | --- |
-| 1–8 | Tutorial | Always unlocked |
-| 9–16 | Easy | Bent / L pieces |
-| 17–28 | Normal | Mixed shapes |
-| 29–40 | Hard | Dense boards |
-| 41–62 | Expert / Master | Up to 99 arrows |
-| **63–80** | **Défi** | **Lv 67 & 68 = 100 arrows · Lv 73 & 74 = 150 · Lv 80 = 180** |
+Node 22+, puis `npm ci`.
 
-FR / EN, hearts, hints, stars, daily challenge, endless mode. Progress is stored in the browser.
+- `npm run dev` : développement.
+- `npm run typecheck` : contrôle TypeScript.
+- `npm test` : vérifications du moteur, des niveaux, des sessions et de la géométrie d'animation.
+- `npm run build:netlify` : compilation statique dans `site/`.
 
----
+## Déploiement
 
-## Deploy on Netlify
+Netlify : commande `npm run build:netlify`, dossier publié `site`. Les sources sont reconstruites à chaque déploiement.
 
-Two ways. Use **A** if the site is (or will be) linked to this GitHub repo. Use **B** if there is **no** automatic GitHub deploy.
+Le fichier `neon-arrow-netlify.zip` contient aussi une version compilée pour un déploiement manuel. Les deux modes incluent la licence tierce complète.
 
-### A. Automatic from GitHub
+Voir [CHANGELOG-RUBANS.md](CHANGELOG-RUBANS.md) pour les modifications, les commandes et les limites de validation.
 
-1. Open [app.netlify.com](https://app.netlify.com) → **Add new site** → **Import an existing project** → GitHub → **`axelfisch/neon-arrow-escape`**
-2. Confirm build settings (already in `netlify.toml`):
-   - **Build command:** `echo using-prebuilt-site`
-   - **Publish directory:** `site`
-   - **Node:** 22
-3. Deploy. Every push to `main` republishes.
+## Crédits
 
-If the site is already connected and still shows the old 20-level HTML:
+Les géométries importées et le mouvement adapté proviennent de [Arrow Escape](https://github.com/crudeGithub/Arrow-Escape-Game-Source-Code), Copyright (c) 2026 Umang, MIT.
 
-- Site configuration → **Build & deploy** → **Build settings**
-- Set **Publish directory** to `site`
-- Set **Build command** to `echo using-prebuilt-site` (or leave empty)
-- **Deploys** → **Trigger deploy** → **Deploy site**
-
-### B. Manual zip (no GitHub hook)
-
-The file **`neon-arrow-netlify.zip`** is a finished static site. No build step.
-
-1. Download the zip (from this chat, or clone the repo and zip `site/`)
-2. [app.netlify.com](https://app.netlify.com) → **Add new site** → **Deploy manually**
-3. Drag the zip onto the drop zone
-4. Or, on an existing site: **Deploys** → **Trigger deploy** → drag the zip / unzipped `site` folder
-
-SPA routes (`/levels`, `/play/67`, …) work because `_redirects` sends everything to `index.html`.
-
----
-
-## Scripts
-
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Local preview |
-| `npm run build:netlify` | Rebuild static export → `site/` |
-| `npm run build` | Full SSR build (Vercel / Grok) |
+Voir [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) et [la licence originale](public/licenses/arrow-escape-MIT.txt). Les crédits sont aussi accessibles dans le jeu.

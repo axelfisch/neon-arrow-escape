@@ -24,7 +24,9 @@ export function Home() {
   return (
     <Shell>
       <section className="flex flex-col items-start pt-4">
-        <p className="font-mono text-[11px] tracking-[0.32em] text-muted uppercase">{t(lang, "tag")}</p>
+        <p className="font-mono text-[11px] tracking-[0.32em] text-muted uppercase">
+          {t(lang, "tag")}
+        </p>
         <h1 className="font-display glow-cyan mt-3 text-5xl leading-none font-semibold tracking-tight text-accent sm:text-6xl">
           NEON
           <br />
@@ -32,8 +34,8 @@ export function Home() {
         </h1>
         <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted">
           {lang === "fr"
-            ? "Puzzle d'évasion. 80 niveaux, génération inverse, défis à 100 et 150 flèches. Une seule erreur peut tout fermer."
-            : "Escape puzzle. 80 levels, reverse generation, 100- and 150-arrow gauntlets. One blocked tap can end it."}
+            ? "Démêle les rubans de lumière. 80 niveaux, des courbes à explorer et des flèches qui se déroulent sous tes doigts."
+            : "Untangle ribbons of light. 80 levels, winding shapes to explore and arrows that unwind at your fingertips."}
         </p>
 
         <div className="mt-6 flex flex-wrap gap-2 font-mono text-[11px] text-faint">
@@ -100,15 +102,15 @@ export function Home() {
           ].map((g) => {
             const n = levels.find((l) => l.id === g.id)?.arrowCount ?? g.id;
             return (
-            <Link
-              key={g.id}
-              to="/play/$levelId"
-              params={{ levelId: String(g.id) }}
-              className="rounded-2xl border border-danger/30 bg-danger/6 px-3 py-3 text-center hover:border-danger/55"
-            >
-              <p className="font-mono text-[10px] tracking-wider text-danger">{n}</p>
-              <p className="mt-1 font-display text-xs font-semibold">{g.label}</p>
-            </Link>
+              <Link
+                key={g.id}
+                to="/play/$levelId"
+                params={{ levelId: String(g.id) }}
+                className="rounded-2xl border border-danger/30 bg-danger/6 px-3 py-3 text-center hover:border-danger/55"
+              >
+                <p className="font-mono text-[10px] tracking-wider text-danger">{n}</p>
+                <p className="mt-1 font-display text-xs font-semibold">{g.label}</p>
+              </Link>
             );
           })}
         </div>

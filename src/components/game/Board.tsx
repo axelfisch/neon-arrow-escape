@@ -1,20 +1,124 @@
-import { useMemo } from "react";
-import type { Dir, Piece } from "@/game/types";
-import { PIECE_COLORS } from "@/game/types";
-import { canRemove, headCell, pathPreview, pieceAt, tailCell } from "@/game/engine";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import type { Cell, Dir, Piece } from "@/game/types";
+import { DELTA, PIECE_COLORS } from "@/game/types";
+import { canRemove, pathPreview, pieceAt } from "@/game/engine";
+import { escapeDistance, escapeFrame, ribbonPath } from "@/game/escape";
+import { clampCamera, LONG_PRESS_MS, TAP_SLOP, zoomAt, type Camera } from "@/game/viewport";
 import { cn } from "@/lib/cn";
 
-function arrowHead(x: number, y: number, dir: Dir, s: number) {
-  switch (dir) {
-    case "right":
-      return `${x + s},${y} ${x - s * 0.7},${y - s * 0.82} ${x - s * 0.7},${y + s * 0.82}`;
-    case "left":
-      return `${x - s},${y} ${x + s * 0.7},${y - s * 0.82} ${x + s * 0.7},${y + s * 0.82}`;
-    case "down":
-      return `${x},${y + s} ${x - s * 0.82},${y - s * 0.7} ${x + s * 0.82},${y - s * 0.7}`;
-    case "up":
-      return `${x},${y - s} ${x - s * 0.82},${y + s * 0.7} ${x + s * 0.82},${y + s * 0.7}`;
-  }
+export type Departure = { piece: Piece; token: number };
+type Point = { x: number; y: number };
+type Press = Point & {
+  camera: Camera;
+  units: number;
+  id: string | null;
+  moved: boolean;
+  held: boolean;
+};
+type Pinch = { distance: number; middle: Point; camera: Camera; anchor: Cell; units: number };
+
+function arrowHead(head: Cell, dir: Dir, size: number) {
+  const d = DELTA[dir],
+    x = head.c + 0.5,
+    y = head.r + 0.5;
+  return `${x + d.dc * size},${y + d.dr * size} ${x - d.dc * size * 0.65 - d.dr * size * 0.7},${y - d.dr * size * 0.65 + d.dc * size * 0.7} ${x - d.dc * size * 0.65 + d.dr * size * 0.7},${y - d.dr * size * 0.65 - d.dc * size * 0.7}`;
+}
+
+const Glyph = memo(function Glyph({
+  piece,
+  path = piece.path,
+  focus = false,
+  hint = false,
+  invalid = false,
+  free = false,
+  dense = false,
+}: {
+  piece: Piece;
+  path?: Cell[];
+  focus?: boolean;
+  hint?: boolean;
+  invalid?: boolean;
+  free?: boolean;
+  dense?: boolean;
+}) {
+  const col = invalid ? "#ff3d6b" : PIECE_COLORS[piece.color % PIECE_COLORS.length]!;
+  const head = path[0]!,
+    tail = path[path.length - 1]!;
+  if (!head) return null;
+  const shape = ribbonPath(path),
+    width = dense ? 0.13 : 0.18;
+  return (
+    <g className={invalid ? "piece-invalid" : undefined}>
+      <path
+        d={shape}
+        fill="none"
+        stroke={col}
+        strokeWidth={width + 0.16}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={focus || hint ? 0.3 : free ? 0.14 : 0.06}
+      />
+      <path
+        d={shape}
+        fill="none"
+        stroke={col}
+        strokeWidth={focus || hint ? width + 0.04 : width}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx={tail.c + 0.5} cy={tail.r + 0.5} r={0.055} fill={col} opacity={0.5} />
+      <polygon points={arrowHead(head, piece.dir, dense ? 0.23 : 0.29)} fill={col} />
+      {(hint || focus) && (
+        <circle
+          cx={head.c + 0.5}
+          cy={head.r + 0.5}
+          r={0.43}
+          fill="none"
+          stroke={col}
+          strokeWidth={0.035}
+          opacity={0.8}
+        />
+      )}
+    </g>
+  );
+});
+
+function FlyingArrow({
+  departure,
+  w,
+  h,
+  onDone,
+}: {
+  departure: Departure;
+  w: number;
+  h: number;
+  onDone: (token: number) => void;
+}) {
+  const [distance, setDistance] = useState(0),
+    done = useRef(onDone);
+  done.current = onDone;
+  useEffect(() => {
+    let frame = 0,
+      start: number | null = null;
+    const total = escapeDistance(departure.piece, w, h);
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 80
+      : Math.min(1800, Math.max(400, total * 30));
+    const tick = (now: number) => {
+      start ??= now;
+      const progress = Math.min(1, (now - start) / duration);
+      setDistance(total * progress);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+      else done.current(departure.token);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [departure, w, h]);
+  return (
+    <g pointerEvents="none" data-departure={departure.token}>
+      <Glyph piece={departure.piece} path={escapeFrame(departure.piece, distance)} free />
+    </g>
+  );
 }
 
 export function Board({
@@ -24,11 +128,16 @@ export function Board({
   hoverId,
   selectedId,
   hintId,
-  removingId,
+  departures,
   invalidId,
   shaking,
+  zoom,
+  onZoom,
   onHover,
+  onInspect,
   onActivate,
+  onDepartureDone,
+  lang,
 }: {
   pieces: Piece[];
   w: number;
@@ -36,148 +145,297 @@ export function Board({
   hoverId: string | null;
   selectedId: string | null;
   hintId: string | null;
-  removingId: string | null;
+  departures: Departure[];
   invalidId: string | null;
   shaking: boolean;
+  zoom: number;
+  lang: "fr" | "en";
+  onZoom: (zoom: number) => void;
   onHover: (id: string | null) => void;
+  onInspect: (id: string) => void;
   onActivate: (id: string) => void;
+  onDepartureDone: (token: number) => void;
 }) {
-  const focus = selectedId ?? hoverId;
-  const focusPiece = pieces.find((p) => p.id === focus) ?? null;
+  const svg = useRef<SVGSVGElement>(null),
+    [center, setCenter] = useState({ x: w / 2, y: h / 2 });
+  const camera = clampCamera({ ...center, zoom }, w, h),
+    cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  const callbacks = useRef({ onInspect });
+  callbacks.current = { onInspect };
+  const pointers = useRef(new Map<number, Point>()),
+    press = useRef<Press | null>(null),
+    pinch = useRef<Pinch | null>(null);
+  const suppressed = useRef(false),
+    timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHold = () => {
+    if (timer.current != null) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(
+    () => () => {
+      if (timer.current != null) clearTimeout(timer.current);
+    },
+    [],
+  );
+  const toBoard = (x: number, y: number): Cell => {
+    const matrix = svg.current?.getScreenCTM();
+    if (!matrix) return { c: -1, r: -1 };
+    const point = new DOMPoint(x, y).matrixTransform(matrix.inverse());
+    return { c: point.x, r: point.y };
+  };
+  const hit = (x: number, y: number) => {
+    const p = toBoard(x, y);
+    return pieceAt(pieces, Math.floor(p.c), Math.floor(p.r));
+  };
+  const updateCamera = (next: Camera) => {
+    const clamped = clampCamera(next, w, h);
+    cameraRef.current = clamped;
+    setCenter({ x: clamped.x, y: clamped.y });
+    onZoom(clamped.zoom);
+  };
+  const cancel = (id: number) => {
+    clearHold();
+    pointers.current.delete(id);
+    press.current = null;
+    pinch.current = null;
+    suppressed.current = pointers.current.size > 0;
+    onHover(null);
+  };
+  const focus = selectedId ?? hoverId,
+    focusPiece = pieces.find((p) => p.id === focus);
   const preview = useMemo(
     () => (focusPiece ? pathPreview(focusPiece, pieces, w, h) : null),
     [focusPiece, pieces, w, h],
   );
-
-  const maxSide = Math.min(w, h);
-  const dense = pieces.length >= 80;
+  const free = useMemo(
+    () => new Set(pieces.filter((p) => canRemove(p, pieces, w, h)).map((p) => p.id)),
+    [pieces, w, h],
+  );
+  const dense = pieces.length >= 60;
 
   return (
-    <div className={cn("relative w-full", shaking && "board-shake")}>
+    <div className={cn("board-viewport", shaking && "board-shake")}>
       <svg
-        viewBox={`0 0 ${w} ${h}`}
-        className="h-auto w-full touch-none select-none"
-        role="img"
-        aria-label="arrow board"
-        onPointerLeave={() => onHover(null)}
+        ref={svg}
+        viewBox={`${camera.x - w / (2 * camera.zoom)} ${camera.y - h / (2 * camera.zoom)} ${w / camera.zoom} ${h / camera.zoom}`}
+        className="game-board"
+        role="group"
+        aria-label={lang === "fr" ? "Plateau de flèches" : "Arrow board"}
+        data-zoom={camera.zoom.toFixed(2)}
+        onContextMenu={(e) => e.preventDefault()}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          svg.current?.setPointerCapture(e.pointerId);
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          clearHold();
+          if (pointers.current.size >= 2) {
+            suppressed.current = true;
+            press.current = null;
+            onHover(null);
+            const [a, b] = [...pointers.current.values()],
+              middle = { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 };
+            pinch.current = {
+              distance: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
+              middle,
+              camera: cameraRef.current,
+              anchor: toBoard(middle.x, middle.y),
+              units: 1 / (svg.current?.getScreenCTM()?.a ?? 1),
+            };
+            return;
+          }
+          const id = hit(e.clientX, e.clientY)?.id ?? null;
+          press.current = {
+            x: e.clientX,
+            y: e.clientY,
+            camera: cameraRef.current,
+            units: 1 / (svg.current?.getScreenCTM()?.a ?? 1),
+            id,
+            moved: false,
+            held: false,
+          };
+          if (id)
+            timer.current = setTimeout(() => {
+              const p = press.current;
+              if (!p || p.moved || pointers.current.size !== 1 || suppressed.current) return;
+              p.held = true;
+              callbacks.current.onInspect(id);
+            }, LONG_PRESS_MS);
+        }}
         onPointerMove={(e) => {
-          const svg = e.currentTarget;
-          const rect = svg.getBoundingClientRect();
-          const c = Math.floor(((e.clientX - rect.left) / rect.width) * w);
-          const r = Math.floor(((e.clientY - rect.top) / rect.height) * h);
-          const p = pieceAt(pieces, c, r);
-          onHover(p?.id ?? null);
+          if (!pointers.current.has(e.pointerId)) {
+            if (e.pointerType === "mouse") onHover(hit(e.clientX, e.clientY)?.id ?? null);
+            return;
+          }
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pointers.current.size >= 2 && pinch.current) {
+            const [a, b] = [...pointers.current.values()],
+              start = pinch.current;
+            const distance = Math.hypot(a!.x - b!.x, a!.y - b!.y),
+              middle = { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 };
+            const next = zoomAt(
+                start.camera,
+                (start.camera.zoom * distance) / start.distance,
+                start.anchor,
+                w,
+                h,
+              ),
+              scale = (start.units * start.camera.zoom) / next.zoom;
+            updateCamera({
+              ...next,
+              x: next.x - (middle.x - start.middle.x) * scale,
+              y: next.y - (middle.y - start.middle.y) * scale,
+            });
+            return;
+          }
+          const p = press.current;
+          if (!p || suppressed.current) return;
+          const dx = e.clientX - p.x,
+            dy = e.clientY - p.y;
+          if (Math.hypot(dx, dy) > TAP_SLOP) {
+            p.moved = true;
+            clearHold();
+            onHover(null);
+          }
+          if (p.moved)
+            updateCamera({
+              ...p.camera,
+              x: p.camera.x - dx * p.units,
+              y: p.camera.y - dy * p.units,
+            });
         }}
         onPointerUp={(e) => {
-          const svg = e.currentTarget;
-          const rect = svg.getBoundingClientRect();
-          const c = Math.floor(((e.clientX - rect.left) / rect.width) * w);
-          const r = Math.floor(((e.clientY - rect.top) / rect.height) * h);
-          const p = pieceAt(pieces, c, r);
-          if (p) onActivate(p.id);
+          clearHold();
+          const p = press.current;
+          if (
+            p &&
+            !p.moved &&
+            !p.held &&
+            !suppressed.current &&
+            pointers.current.size === 1 &&
+            p.id &&
+            hit(e.clientX, e.clientY)?.id === p.id
+          )
+            onActivate(p.id);
+          pointers.current.delete(e.pointerId);
+          if (!pointers.current.size) {
+            press.current = null;
+            pinch.current = null;
+            suppressed.current = false;
+          }
+          onHover(null);
+        }}
+        onPointerCancel={(e) => cancel(e.pointerId)}
+        onLostPointerCapture={(e) => {
+          if (pointers.current.has(e.pointerId)) cancel(e.pointerId);
+        }}
+        onPointerLeave={() => {
+          if (!pointers.current.size) onHover(null);
+        }}
+        onWheel={(e) => {
+          if (!e.ctrlKey && !e.metaKey) return;
+          e.preventDefault();
+          updateCamera(
+            zoomAt(
+              cameraRef.current,
+              cameraRef.current.zoom * Math.exp(-e.deltaY * 0.005),
+              toBoard(e.clientX, e.clientY),
+              w,
+              h,
+            ),
+          );
         }}
       >
-        <rect x={0} y={0} width={w} height={h} rx={0.18} fill="#0d1426" stroke="rgba(232,238,248,0.08)" strokeWidth={0.03} />
+        <rect
+          width={w}
+          height={h}
+          rx={0.2}
+          fill="#0d1426"
+          stroke="rgba(232,238,248,0.1)"
+          strokeWidth={0.03}
+        />
         {Array.from({ length: w - 1 }, (_, i) => (
-          <line key={`v${i}`} x1={i + 1} y1={0} x2={i + 1} y2={h} stroke="rgba(255,255,255,0.035)" strokeWidth={0.015} />
+          <line
+            key={`v${i}`}
+            x1={i + 1}
+            y1={0}
+            x2={i + 1}
+            y2={h}
+            stroke="rgba(255,255,255,0.035)"
+            strokeWidth={0.015}
+          />
         ))}
         {Array.from({ length: h - 1 }, (_, i) => (
-          <line key={`h${i}`} x1={0} y1={i + 1} x2={w} y2={i + 1} stroke="rgba(255,255,255,0.035)" strokeWidth={0.015} />
+          <line
+            key={`h${i}`}
+            x1={0}
+            y1={i + 1}
+            x2={w}
+            y2={i + 1}
+            stroke="rgba(255,255,255,0.035)"
+            strokeWidth={0.015}
+          />
         ))}
-
         {preview &&
+          focusPiece &&
           preview.rays.map((ray, i) => {
-            const col = preview.clear ? "#00d4ff" : "#ff3d6b";
-            const pts = [ray.from, ...ray.cells, ray.blocked].filter(Boolean) as { c: number; r: number }[];
-            if (pts.length < 2) {
-              const d = focusPiece!.dir;
-              const end =
-                d === "right"
-                  ? { c: w, r: ray.from.r }
-                  : d === "left"
-                    ? { c: -1, r: ray.from.r }
-                    : d === "down"
-                      ? { c: ray.from.c, r: h }
-                      : { c: ray.from.c, r: -1 };
-              pts.push(end);
-            }
+            const d = DELTA[focusPiece.dir],
+              end = ray.blocked ?? {
+                c: ray.from.c + d.dc * (w + h),
+                r: ray.from.r + d.dr * (w + h),
+              };
             return (
-              <polyline
-                key={`ray-${i}`}
-                points={pts.map((p) => `${p.c + 0.5},${p.r + 0.5}`).join(" ")}
-                fill="none"
-                stroke={col}
-                strokeWidth={dense ? 0.06 : 0.08}
+              <line
+                key={i}
+                x1={ray.from.c + 0.5}
+                y1={ray.from.r + 0.5}
+                x2={end.c + 0.5}
+                y2={end.r + 0.5}
+                stroke={preview.clear ? "#00d4ff" : "#ff3d6b"}
+                strokeWidth={0.055}
                 strokeDasharray="0.16 0.12"
-                opacity={0.55}
+                opacity={0.7}
               />
             );
           })}
-
-        {pieces.map((p) => {
-          const free = canRemove(p, pieces, w, h);
-          const col = PIECE_COLORS[p.color % PIECE_COLORS.length]!;
-          const head = headCell(p);
-          const tail = tailCell(p);
-          const hx = head.c + 0.5;
-          const hy = head.r + 0.5;
-          const multi = p.path.length > 1;
-          const pts = p.path.map((c) => `${c.c + 0.5},${c.r + 0.5}`).join(" ");
-          const as = dense ? 0.22 : maxSide >= 14 ? 0.26 : 0.3;
-          const lw = dense ? 0.14 : 0.2;
-          const isFocus = focus === p.id;
-          const isHint = hintId === p.id;
-          const isRm = removingId === p.id;
-          const isInv = invalidId === p.id;
-          const anim = isRm ? `slide-${p.dir}` : isInv ? "piece-invalid" : "";
-
-          return (
-            <g
-              key={p.id}
-              className={anim}
-              opacity={isRm ? 0.85 : 1}
-              style={{ transformOrigin: `${hx}px ${hy}px` }}
-            >
-              {isHint && (
-                <circle cx={hx} cy={hy} r={0.46} fill="none" stroke={col} strokeWidth={0.045} opacity={0.8}>
-                  <animate attributeName="r" values="0.38;0.52;0.38" dur="1.1s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.35;0.9;0.35" dur="1.1s" repeatCount="indefinite" />
-                </circle>
-              )}
-              {multi && (
-                <polyline
-                  points={pts}
-                  fill="none"
-                  stroke={col}
-                  strokeWidth={lw + 0.16}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={free ? 0.22 : 0.07}
-                />
-              )}
-              {multi ? (
-                <polyline
-                  points={pts}
-                  fill="none"
-                  stroke={col}
-                  strokeWidth={lw}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={isFocus ? 1 : 0.92}
-                />
-              ) : (
-                <circle cx={hx} cy={hy} r={lw * 0.55} fill={col} opacity={free ? 0.95 : 0.72} />
-              )}
-              {multi && <circle cx={tail.c + 0.5} cy={tail.r + 0.5} r={0.07} fill={col} opacity={0.55} />}
-              <polygon
-                points={arrowHead(hx, hy, p.dir, as)}
-                fill={col}
-                opacity={free ? 1 : 0.72}
-                style={free ? { filter: `drop-shadow(0 0 0.08px ${col})` } : undefined}
-              />
-            </g>
-          );
-        })}
+        {pieces.map((p, index) => (
+          <g
+            key={p.id}
+            role="button"
+            tabIndex={0}
+            data-piece={p.id}
+            aria-label={`${lang === "fr" ? "Flèche" : "Arrow"} ${index + 1} ${p.dir}`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onActivate(p.id);
+              } else if (e.key.toLowerCase() === "i") {
+                e.preventDefault();
+                onInspect(p.id);
+              }
+            }}
+            onFocus={() => onHover(p.id)}
+            onBlur={() => onHover(null)}
+          >
+            <Glyph
+              piece={p}
+              free={free.has(p.id)}
+              focus={focus === p.id}
+              hint={hintId === p.id}
+              invalid={invalidId === p.id}
+              dense={dense}
+            />
+          </g>
+        ))}
+        {departures.map((departure) => (
+          <FlyingArrow
+            key={departure.token}
+            departure={departure}
+            w={w}
+            h={h}
+            onDone={onDepartureDone}
+          />
+        ))}
       </svg>
     </div>
   );

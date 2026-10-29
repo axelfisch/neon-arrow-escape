@@ -10,7 +10,7 @@ import {
   cellKey,
 } from "./types";
 import { mulberry32, pick, shuffle } from "./rng";
-import { scoreDifficulty, verifySolution, walkRay, countTurns, exitFace } from "./engine";
+import { scoreDifficulty, verifySolution, walkRay, countTurns } from "./engine";
 
 export type ShapeKind = "dot" | "straight" | "L" | "U" | "S" | "zigzag" | "spiral";
 
@@ -237,8 +237,7 @@ function absorbPockets(
 
 function uniqueFace(path: Cell[], dir: Dir): boolean {
   if (!path.length) return false;
-  const fake: Piece = { id: "x", path, dir, color: 0 };
-  return exitFace(fake).length === 1;
+  return path.slice(1).every(cell => behindHead(cell, path[0]!, dir));
 }
 
 function collectHeads(
