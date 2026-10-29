@@ -26,7 +26,9 @@ Voir THIRD_PARTY_NOTICES.md et public/licenses/arrow-escape-MIT.txt. La notice M
 - `npm run typecheck` : vérification TypeScript.
 - `npm run build:netlify` : compilation du site statique dans `site/`.
 
-Ces contrôles ne remplacent pas la validation des gestes sur un iPhone physique. La vérification visuelle automatisée a été interrompue pendant cette session et n'est pas déclarée réussie.
+Vérification visuelle reprise avec succès dans le navigateur intégré le 29 octobre 2026 : affichage de bureau et largeur CSS de 390 px (hauteur 843 px), sans débordement horizontal ; lancement au clavier et par pression sur la pointe ; trois départs successifs et victoire ; annulation d'un retrait et récupération d'une vie perdue ; aperçu par appui long sans coup consommé ; zoom, recentrage et déplacement sans lancement accidentel ; crédits MIT visibles. Aucune erreur de console capturée pendant ces essais. Capture : docs/qa/neon-ribbons-mobile.png.
+
+Le pincement à deux doigts et le confort sur iPhone physique restent à valider. La difficulté ressentie des nouveaux tableaux reste à équilibrer.
 
 ## Publication
 
