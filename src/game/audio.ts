@@ -1,11 +1,18 @@
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let enabled = true;
+let suspended = false;
+export function suspendAudio() {
+  suspended = true;
+  if (ctx) void ctx.suspend().catch(() => {});
+}
 
 function getCtx() {
   if (typeof window === "undefined") return null;
   if (!ctx) {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     ctx = new AC({ latencyHint: "interactive" });
     master = ctx.createGain();
     master.gain.value = 0.22;
@@ -16,6 +23,7 @@ function getCtx() {
 }
 
 export function unlockAudio() {
+  suspended = false;
   getCtx();
 }
 
@@ -27,14 +35,15 @@ export function setSoundEnabled(on: boolean) {
 }
 
 function beep(freq: number, dur: number, type: OscillatorType, gain = 0.18, slide = 0) {
-  if (!enabled) return;
+  if (!enabled || suspended) return;
   const ac = getCtx();
   if (!ac || !master) return;
   const osc = ac.createOscillator();
   const g = ac.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, ac.currentTime);
-  if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), ac.currentTime + dur);
+  if (slide)
+    osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), ac.currentTime + dur);
   g.gain.setValueAtTime(0.0001, ac.currentTime);
   g.gain.exponentialRampToValueAtTime(gain, ac.currentTime + 0.012);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);

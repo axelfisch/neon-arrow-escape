@@ -27,7 +27,7 @@ export function DailyPage() {
   }
 
   return (
-    <Shell wide>
+    <Shell wide game>
       <PlayView
         level={pack.level}
         subtitle={t(lang, "daily")}

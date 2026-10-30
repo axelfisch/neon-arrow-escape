@@ -1,0 +1,13 @@
+{
+  "appId": "com.aixelstudio.neonarrow",
+  "appName": "Neon Arrow",
+  "webDir": "site",
+  "backgroundColor": "#070b16",
+  "includePlugins": [],
+  "ios": {
+    "contentInset": "never",
+    "preferredContentMode": "mobile",
+    "backgroundColor": "#070b16",
+    "webContentsDebuggingEnabled": false
+  }
+}

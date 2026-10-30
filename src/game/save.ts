@@ -1,3 +1,4 @@
+import { readStored, writeStored } from "./storage";
 import { DEFAULT_PROGRESS, type Progress } from "./types";
 
 const KEY = "neon-arrow-escape-v1";
@@ -18,14 +19,14 @@ function migrate(raw: Partial<Progress> | null): Progress {
     bestTime: raw.bestTime && typeof raw.bestTime === "object" ? raw.bestTime : {},
     lang: raw.lang === "en" ? "en" : "fr",
     sound: raw.sound !== false,
-    inspect: raw.inspect !== false,
+    inspect: raw.inspect === true,
   };
 }
 
 export function loadProgress(): Progress {
   if (typeof window === "undefined") return { ...DEFAULT_PROGRESS };
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readStored(KEY);
     return migrate(raw ? (JSON.parse(raw) as Partial<Progress>) : null);
   } catch {
     return { ...DEFAULT_PROGRESS };
@@ -35,7 +36,7 @@ export function loadProgress(): Progress {
 export function saveProgress(p: Progress) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    writeStored(KEY, JSON.stringify(p));
   } catch {
     /* private mode */
   }

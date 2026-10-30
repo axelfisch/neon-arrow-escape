@@ -14,3 +14,12 @@ Adaptations in this project:
 
 The original MIT notice is reproduced without changes in `public/licenses/arrow-escape-MIT.txt`, included in the built app and linked from its footer. This notice does not relicense the rest of Neon Arrow. No Unity runtime, advertising SDK, bundled third-party assets, or third-party packages from the upstream project are imported.
 
+
+
+## iOS runtime and bundled fonts
+
+Capacitor 8.5.3 (Ionic team) is distributed under MIT; full notice: public/licenses/capacitor-MIT.txt. The iOS build uses the official Capacitor and Cordova XCFrameworks from capacitor-swift-pm release 8.5.3. The preparation script pins and verifies their published SHA-256 checksums.
+
+IBM Plex Mono, IBM Plex Sans, and Syne are bundled locally from the Google Fonts distribution under SIL Open Font License 1.1. Their original notices are in public/licenses/ibmplexmono-OFL.txt, ibmplexsans-OFL.txt and syne-OFL.txt. These notices ship in the app and are linked from Settings. Font files are unmodified Latin subset distributions.
+
+The iOS layout uses the Claude Design handoff supplied by Axel on 2026-10-30 as a visual reference. Its demonstration engine and design runtime (support.js) are not imported; the application keeps the tested Neon Arrow engine.

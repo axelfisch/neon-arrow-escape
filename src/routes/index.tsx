@@ -4,6 +4,8 @@ import { ArrowRight, Infinity as InfinityIcon, LayoutGrid, Sun } from "lucide-re
 import { Shell } from "@/components/game/Shell";
 import { useProgress } from "@/game/progress-store";
 import { t, type Lang } from "@/game/i18n";
+import { readCheckpoint, restoreCheckpoint } from "@/game/checkpoint";
+import { getLevel } from "@/game/catalog";
 import { getLevels } from "@/game/catalog";
 import { dailySeed } from "@/game/generator";
 import { unlockAudio } from "@/game/audio";
@@ -14,9 +16,13 @@ export function Home() {
   const progress = useProgress((s) => s.progress);
   const lang = progress.lang;
   const levels = useMemo(() => getLevels(), []);
-  const nextId =
-    levels.find((l) => l.id <= 62 && !progress.completed.includes(l.id))?.id ??
-    (progress.completed.length ? 80 : 1);
+  const checkpoint = readCheckpoint();
+  const resumeLevel = checkpoint ? getLevel(checkpoint.levelId) : null;
+  const resumable = resumeLevel && restoreCheckpoint(resumeLevel);
+  const nextId = resumable
+    ? resumeLevel!.id
+    : (levels.find((l) => l.id <= 62 && !progress.completed.includes(l.id))?.id ??
+      (progress.completed.length ? 80 : 1));
   const cleared = progress.completed.length;
   const stars = Object.values(progress.stars).reduce((n, s) => n + s, 0);
   const today = dailySeed().key;
@@ -56,7 +62,13 @@ export function Home() {
             className="flex items-center justify-between rounded-2xl bg-fg px-5 py-4 text-bg transition-transform active:scale-[0.99]"
           >
             <span className="font-display text-lg font-semibold">
-              {cleared === 0 ? t(lang, "play") : t(lang, "continue")}
+              {resumable
+                ? lang === "fr"
+                  ? "Reprendre ma partie"
+                  : "Resume game"
+                : cleared === 0
+                  ? t(lang, "play")
+                  : t(lang, "continue")}
             </span>
             <ArrowRight className="size-5" />
           </Link>

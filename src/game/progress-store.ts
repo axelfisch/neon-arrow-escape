@@ -15,7 +15,7 @@ export const useProgress = create<Store>((set, get) => ({
   ready: false,
   progress: { ...DEFAULT_PROGRESS },
   hydrate: () => {
-    set({ progress: loadProgress(), ready: true });
+    if (!get().ready) set({ progress: loadProgress(), ready: true });
   },
   setProgress: (p) => {
     saveProgress(p);

@@ -25,7 +25,7 @@ export function PlayPage() {
   }
 
   return (
-    <Shell wide>
+    <Shell wide game>
       <PlayView
         key={level.key}
         level={level}

@@ -81,6 +81,7 @@ function FlyingArrow({
   unit,
   effects,
   dense,
+  reduced,
 }: {
   departure: Departure;
   w: number;
@@ -89,9 +90,9 @@ function FlyingArrow({
   unit: number;
   effects: boolean;
   dense: boolean;
+  reduced: boolean;
 }) {
   const [{ distance, age }, setFrame] = useState({ distance: 0, age: 0 }),
-    [reduced] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches),
     done = useRef(onDone);
   done.current = onDone;
   useEffect(() => {
@@ -110,8 +111,16 @@ function FlyingArrow({
     return () => cancelAnimationFrame(frame);
   }, [departure, w, h, reduced]);
   return (
-    <g pointerEvents="none" data-departure={departure.token}>
-      <Glyph piece={departure.piece} path={escapeFrame(departure.piece, distance)} dense={dense} />
+    <g
+      pointerEvents="none"
+      data-departure={departure.token}
+      opacity={reduced ? Math.max(0, 1 - age / 80) : 1}
+    >
+      <Glyph
+        piece={departure.piece}
+        path={reduced ? departure.piece.path : escapeFrame(departure.piece, distance)}
+        dense={dense}
+      />
       {effects && !reduced && (
         <DepartureEffects piece={departure.piece} distance={distance} age={age} unit={unit} />
       )}
@@ -129,6 +138,7 @@ export function Board({
   departures,
   invalidId,
   shaking,
+  reduced = false,
   zoom,
   onZoom,
   onHover,
@@ -146,6 +156,7 @@ export function Board({
   departures: Departure[];
   invalidId: string | null;
   shaking: boolean;
+  reduced?: boolean;
   zoom: number;
   lang: "fr" | "en";
   onZoom: (zoom: number) => void;
@@ -446,6 +457,7 @@ export function Board({
             unit={effectUnit}
             effects={index >= departures.length - 8}
             dense={dense}
+            reduced={reduced}
             onDone={onDepartureDone}
           />
         ))}

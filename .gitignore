@@ -12,3 +12,7 @@ attachments
 .node_modules.lock
 dist
 .DS_Store
+
+.build-cache/
+ios/App/NeonRuntime/Frameworks/
+Neon-Arrow-iOS-*.zip

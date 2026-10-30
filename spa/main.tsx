@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Link,
@@ -15,6 +15,10 @@ import { DailyPage } from "@/routes/daily";
 import { EndlessPage } from "@/routes/endless";
 import { Shell } from "@/components/game/Shell";
 import "@/styles.css";
+import { useReducedMotion } from "@/components/game/SettingsPanel";
+import { initializeDevice } from "@/game/device";
+import { useSettings } from "@/game/settings";
+import { useProgress } from "@/game/progress-store";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -81,8 +85,32 @@ const router = createRouter({ routeTree });
 const el = document.getElementById("app");
 if (!el) throw new Error("Missing #app");
 
-createRoot(el).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-);
+function PreferencesEffects() {
+  const reduced = useReducedMotion();
+  useEffect(() => {
+    document.documentElement.classList.toggle("reduced-motion", reduced);
+  }, [reduced]);
+  return null;
+}
+async function boot() {
+  try {
+    await initializeDevice();
+    useSettings.getState().hydrate();
+    useProgress.getState().hydrate();
+    createRoot(el!).render(
+      <StrictMode>
+        <PreferencesEffects />
+        <RouterProvider router={router} />
+      </StrictMode>,
+    );
+  } catch {
+    // Preserve the native file if it cannot be read; never silently overwrite it.
+    el!.replaceChildren();
+    const message = document.createElement("p");
+    message.textContent =
+      "Impossible de lire la sauvegarde. Ferme puis rouvre l’app. Tes données n’ont pas été remplacées.";
+    message.style.cssText = "padding:32px;color:#e8eef8;background:#070b16";
+    el!.append(message);
+  }
+}
+void boot();
