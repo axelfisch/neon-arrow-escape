@@ -32,3 +32,7 @@ Voir [CHANGELOG-RUBANS.md](CHANGELOG-RUBANS.md) pour les modifications, les comm
 Les géométries importées et le mouvement adapté proviennent de [Arrow Escape](https://github.com/crudeGithub/Arrow-Escape-Game-Source-Code), Copyright (c) 2026 Umang, MIT.
 
 Voir [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) et [la licence originale](public/licenses/arrow-escape-MIT.txt). Les crédits sont aussi accessibles dans le jeu.
+
+## Application iOS
+
+Le projet `ios/App/App.xcodeproj` intègre le vrai jeu avec Capacitor 8.5.3, des ressources locales, la reprise de campagne, les vibrations et le partage iOS. Après installation des dépendances : `npm run ios:sync`, puis `npm run ios:open`. Voir [docs/IOS-V1.md](docs/IOS-V1.md) pour les validations, les étapes de signature et les essais restant à faire sur iPhone. Le ZIP Netlify historique concerne la version web publiée ; il ne sert pas à installer l’app iOS.

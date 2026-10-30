@@ -1,13 +1,23 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX, SlidersHorizontal } from "lucide-react";
+import { SettingsPanel } from "./SettingsPanel";
 import { AuthSlot } from "./AuthSlot";
 import { useProgress } from "@/game/progress-store";
 import { setSoundEnabled, unlockAudio } from "@/game/audio";
 import { t } from "@/game/i18n";
 import { cn } from "@/lib/cn";
 
-export function Shell({ children, wide }: { children: ReactNode; wide?: boolean }) {
+export function Shell({
+  children,
+  wide,
+  game = false,
+}: {
+  children: ReactNode;
+  wide?: boolean;
+  game?: boolean;
+}) {
+  const [settings, setSettings] = useState(false);
   const lang = useProgress((s) => s.progress.lang);
   const sound = useProgress((s) => s.progress.sound);
   const patch = useProgress((s) => s.patch);
@@ -16,6 +26,8 @@ export function Shell({ children, wide }: { children: ReactNode; wide?: boolean 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  if (game) return <div className="game-shell">{children}</div>;
 
   return (
     <div className="neon-grid min-h-dvh bg-bg text-fg">
@@ -53,9 +65,17 @@ export function Shell({ children, wide }: { children: ReactNode; wide?: boolean 
             >
               {lang.toUpperCase()}
             </button>
+            <button
+              className="shell-settings"
+              aria-label={lang === "fr" ? "Réglages" : "Settings"}
+              onClick={() => setSettings(true)}
+            >
+              <SlidersHorizontal size={18} />
+            </button>
             <AuthSlot compact />
           </div>
         </header>
+        {settings && <SettingsPanel onClose={() => setSettings(false)} />}
         <div className="flex-1">{children}</div>
         <footer className="mt-8 border-t border-border pt-4 text-xs text-muted">
           <p>Neon Arrow · AiXel Studio</p>

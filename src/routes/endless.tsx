@@ -28,10 +28,7 @@ export function EndlessPage() {
   }
 
   return (
-    <Shell wide>
-      <p className="mb-2 font-mono text-[11px] text-muted">
-        {t(lang, "wave")} {wave} · {t(lang, "best")} {progress.endlessBest}
-      </p>
+    <Shell wide game>
       <PlayView
         key={`${wave}-${tick}`}
         level={level}

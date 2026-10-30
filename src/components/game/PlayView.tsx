@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Heart,
   Lightbulb,
-  RotateCcw,
+  ArrowLeft,
+  Pause,
+  SlidersHorizontal,
+  Share2,
+  Star,
   Undo2,
   ZoomIn,
   ZoomOut,
@@ -14,7 +18,12 @@ import {
 import type { LevelDef } from "@/game/types";
 import { canRemove, freePieces } from "@/game/engine";
 import { createSession, moveSession, undoSession, type Session } from "@/game/session";
-import { sfx, unlockAudio } from "@/game/audio";
+import { impact, isNative, shareResult } from "@/game/device";
+import { restoreCheckpoint, saveCheckpoint, clearCheckpoint } from "@/game/checkpoint";
+import { useSettings } from "@/game/settings";
+import { SettingsPanel, useReducedMotion } from "./SettingsPanel";
+import { Sheet } from "./Sheet";
+import { sfx, unlockAudio, suspendAudio, setSoundEnabled } from "@/game/audio";
 import { t } from "@/game/i18n";
 import { starsFor } from "@/game/save";
 import { useProgress } from "@/game/progress-store";
@@ -40,7 +49,30 @@ export function PlayView({
     inspectPref = useProgress((s) => s.progress.inspect);
   const sound = useProgress((s) => s.progress.sound),
     patch = useProgress((s) => s.patch);
-  const [session, setSession] = useState(() => createSession(level));
+  const [restored] = useState(() => restoreCheckpoint(level));
+  const [session, setSession] = useState(() => restored?.session ?? createSession(level));
+  const [paused, setPaused] = useState(false),
+    [settings, setSettings] = useState(false);
+  const [notice, setNotice] = useState("");
+  const reduced = useReducedMotion(),
+    concentration = useSettings((s) => s.focus);
+  const pauseFrom = useRef<number | null>(null),
+    pausedTime = useRef(0);
+  const elapsed = () =>
+    Math.max(0, (pauseFrom.current ?? Date.now()) - started.current - pausedTime.current);
+  function pause() {
+    pauseFrom.current ??= Date.now();
+    setPaused(true);
+    setDepartures([]);
+    suspendAudio();
+    saveCheckpoint(level, current.current, elapsed());
+  }
+  function resume() {
+    if (pauseFrom.current !== null) pausedTime.current += Date.now() - pauseFrom.current;
+    pauseFrom.current = null;
+    setPaused(false);
+    unlockAudio();
+  }
   const current = useRef(session);
   const { pieces, hearts, moves, mistakes, hintsLeft, undosLeft, hintsUsed } = session;
   const [hoverId, setHoverId] = useState<string | null>(null),
@@ -50,16 +82,17 @@ export function PlayView({
   const [departures, setDepartures] = useState<Departure[]>([]);
   const [zoom, setZoom] = useState(1),
     [round, setRound] = useState(0);
-  const [ended, setEnded] = useState<null | "win" | "lose">(null);
+  const [ended, setEnded] = useState<null | "win" | "lose">(session.hearts <= 0 ? "lose" : null);
   const token = useRef(0),
     reported = useRef(false),
-    started = useRef(Date.now());
+    started = useRef(Date.now() - (restored?.elapsed ?? 0));
   const invalidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callback = useRef(onWin);
   callback.current = onWin;
   const commit = (next: Session) => {
     current.current = next;
     setSession(next);
+    saveCheckpoint(level, next, elapsed());
   };
   const clearInvalid = () => {
     if (invalidTimer.current != null) clearTimeout(invalidTimer.current);
@@ -67,6 +100,11 @@ export function PlayView({
     setInvalidId(null);
   };
   function restart() {
+    clearCheckpoint(level.key);
+    started.current = Date.now();
+    pausedTime.current = 0;
+    pauseFrom.current = null;
+    setPaused(false);
     clearInvalid();
     commit(createSession(level));
     setDepartures([]);
@@ -79,6 +117,34 @@ export function PlayView({
     reported.current = false;
     started.current = Date.now();
   }
+  useEffect(() => {
+    setSoundEnabled(sound);
+  }, [sound]);
+  const pauseCallback = useRef(pause);
+  pauseCallback.current = pause;
+  useEffect(() => {
+    const inactive = () => pauseCallback.current();
+    const visibility = () => {
+      if (document.hidden) inactive();
+    };
+    const saveError = () =>
+      setNotice(
+        lang === "fr"
+          ? "Sauvegarde indisponible : garde l’app ouverte et réessaie."
+          : "Save unavailable: keep the app open and try again.",
+      );
+    window.addEventListener("neon:inactive", inactive);
+    window.addEventListener("neon:save-error", saveError);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      window.removeEventListener("neon:inactive", inactive);
+      window.removeEventListener("neon:save-error", saveError);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [lang]);
+  useEffect(() => {
+    saveCheckpoint(level, current.current, elapsed());
+  }, []);
   useEffect(
     () => () => {
       if (invalidTimer.current != null) clearTimeout(invalidTimer.current);
@@ -86,12 +152,14 @@ export function PlayView({
     [],
   );
   useEffect(() => {
-    if (pieces.length || departures.length || hearts <= 0 || reported.current) return;
+    if (paused || pieces.length || departures.length || hearts <= 0 || reported.current) return;
     reported.current = true;
     if (sound) sfx.win();
+    impact("win");
+    clearCheckpoint(level.key);
     setEnded("win");
-    callback.current(starsFor(mistakes, hintsUsed), moves, Date.now() - started.current);
-  }, [pieces.length, departures.length, hearts, mistakes, hintsUsed, moves, sound]);
+    callback.current(starsFor(mistakes, hintsUsed), moves, elapsed());
+  }, [pieces.length, departures.length, hearts, mistakes, hintsUsed, moves, sound, paused]);
   const finishDeparture = useCallback(
     (id: number) => setDepartures((all) => all.filter((d) => d.token !== id)),
     [],
@@ -116,9 +184,11 @@ export function PlayView({
     setHoverId(null);
     if (next.pieces !== previous.pieces) {
       if (sound) sfx.slide();
+      impact("start");
       setDepartures((all) => [...all, { piece, token: ++token.current }]);
     } else {
       if (sound) sfx.blocked();
+      impact("blocked");
       setInvalidId(id);
       invalidTimer.current = setTimeout(() => setInvalidId(null), 360);
       if (next.hearts <= 0) {
@@ -128,18 +198,20 @@ export function PlayView({
     }
   }
   function activate(id: string) {
-    if (ended || current.current.hearts <= 0) return;
+    if (paused || settings || ended || current.current.hearts <= 0) return;
     if (inspectOn && selectedId !== id) {
       unlockAudio();
       if (sound) sfx.tap();
+      impact("select");
       setSelectedId(id);
       return;
     }
     fire(id);
   }
   function inspect(id: string) {
-    if (ended || current.current.hearts <= 0) return;
+    if (paused || settings || ended || current.current.hearts <= 0) return;
     setSelectedId(id);
+    impact("select");
   }
   function hint() {
     const state = current.current;
@@ -148,6 +220,7 @@ export function PlayView({
     if (!target) return;
     unlockAudio();
     if (sound) sfx.hint();
+    impact("select");
     setHintId(target.id);
     setSelectedId(target.id);
     commit({ ...state, hintsLeft: state.hintsLeft - 1, hintsUsed: state.hintsUsed + 1 });
@@ -157,6 +230,7 @@ export function PlayView({
     const next = undoSession(current.current);
     if (next === current.current) return;
     clearInvalid();
+    impact("undo");
     commit(next);
     setDepartures([]);
     setEnded(null);
@@ -169,200 +243,264 @@ export function PlayView({
   const title = lang === "fr" ? level.nameFr : level.name;
   const tier = TIER_META[level.tier];
 
+  const fr = lang === "fr";
+  async function share() {
+    try {
+      const result = await shareResult(
+        `Neon Arrow · ${title} · ${starsFor(mistakes, hintsUsed)} ★ · ${moves} ${t(lang, "moves")} · AiXel Studio`,
+      );
+      if (result === "unsupported")
+        setNotice(
+          fr
+            ? "Le partage est disponible dans l’app iPhone."
+            : "Sharing is available in the iPhone app.",
+        );
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError"))
+        setNotice(fr ? "Partage indisponible pour le moment." : "Sharing unavailable right now.");
+    }
+  }
+  const status = invalidId
+    ? fr
+      ? "✕ Bloquée"
+      : "✕ Blocked"
+    : focusClear != null
+      ? focusClear
+        ? t(lang, "clearPath")
+        : t(lang, "blocked")
+      : level.id === 1 && moves === 0
+        ? fr
+          ? "Touche une flèche pour la lancer"
+          : "Tap an arrow to launch"
+        : "";
   return (
     <div
       ref={fullscreen.root}
-      className={cn("game-play flex flex-col gap-4", fullscreen.immersive && "is-immersive")}
+      className={cn(
+        "game-play",
+        fullscreen.immersive && "is-immersive",
+        reduced && "motion-reduced",
+        concentration && "concentration",
+      )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] tracking-[0.22em] text-muted uppercase">
-            {level.id > 0 ? `${lang === "fr" ? "Niveau" : "Level"} ${level.id}` : subtitle} ·{" "}
-            {lang === "fr" ? tier.fr : tier.en}
-          </p>
-          <h1 className="font-display mt-1 truncate text-xl font-semibold tracking-tight">
-            {title}
-          </h1>
-          <p className="mt-0.5 font-mono text-[11px] text-faint">
-            {level.arrowCount} {t(lang, "arrows")} · {level.w}×{level.h} · {t(lang, "diff")}{" "}
-            {level.difficulty}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onExit}
-          className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs text-muted hover:text-fg"
-        >
-          {t(lang, "quit")}
-        </button>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2">
-        <div className="flex items-center gap-1.5" aria-label="lives">
-          {Array.from({ length: level.hearts }, (_, i) => (
-            <Heart
-              key={i}
-              className={cn("size-4", i < hearts ? "fill-danger text-danger" : "text-fg/15")}
-              strokeWidth={1.75}
+      <div
+        className="play-content"
+        inert={paused || settings || !!ended}
+        aria-hidden={paused || settings || !!ended}
+      >
+        <header className="play-header">
+          <IconBtn label={t(lang, "back")} onClick={pause}>
+            <ArrowLeft size={22} />
+          </IconBtn>
+          <div className="play-heading">
+            <p>
+              {level.id > 0 ? `${fr ? "Niveau" : "Level"} ${level.id}` : subtitle} ·{" "}
+              {fr ? tier.fr : tier.en}
+            </p>
+            <h1 title={title}>{title}</h1>
+          </div>
+          <IconBtn label="Pause" onClick={pause}>
+            <Pause size={19} />
+          </IconBtn>
+        </header>
+        <div className="play-stats">
+          <div
+            className="play-hearts"
+            aria-label={`${hearts} ${fr ? "vies restantes" : "lives remaining"}`}
+          >
+            {Array.from({ length: level.hearts }, (_, i) => (
+              <Heart
+                key={i}
+                size={20}
+                className={i < hearts ? "fill-danger text-danger" : "text-faint"}
+              />
+            ))}
+          </div>
+          <div className="play-meter" aria-hidden="true">
+            <span
+              style={{ width: `${(100 * (level.arrowCount - remaining)) / level.arrowCount}%` }}
             />
-          ))}
+          </div>
+          <p aria-live="polite" aria-atomic="true">
+            {remaining} / {level.arrowCount}
+            <span>
+              {moves} {t(lang, "moves")}
+            </span>
+          </p>
         </div>
-        <div className="font-mono text-xs tabular-nums text-muted">
-          {t(lang, "moves")} {moves}
-          <span className="mx-2 text-fg/15">/</span>
-          {remaining}
+        <div className="play-board-area">
+          <Board
+            key={`${level.key}-${round}`}
+            pieces={pieces}
+            w={level.w}
+            h={level.h}
+            hoverId={hoverId}
+            selectedId={selectedId}
+            hintId={hintId}
+            departures={departures}
+            invalidId={invalidId}
+            shaking={false}
+            reduced={reduced}
+            zoom={zoom}
+            onZoom={setZoom}
+            lang={lang}
+            onHover={setHoverId}
+            onInspect={inspect}
+            onActivate={activate}
+            onDepartureDone={finishDeparture}
+          />
+          {status && (
+            <p
+              className={cn(
+                "board-status",
+                (invalidId || focusClear === false) && "status-blocked",
+              )}
+              role="status"
+            >
+              {status}
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-1">
+        <nav className="play-dock" aria-label={fr ? "Commandes du jeu" : "Game controls"}>
           <IconBtn
-            disabled={undosLeft <= 0 || !session.history.length || ended === "win"}
+            disabled={undosLeft <= 0 || !session.history.length}
             onClick={undo}
             label={t(lang, "undo")}
           >
-            <Undo2 className="size-3.5" />
-            <span className="font-mono text-[10px]">{undosLeft}</span>
+            <Undo2 size={20} />
+            <span>{undosLeft}</span>
           </IconBtn>
           <IconBtn
             disabled={hintsLeft <= 0 || !remaining || hearts <= 0}
             onClick={hint}
             label={t(lang, "hint")}
           >
-            <Lightbulb className="size-3.5" />
-            <span className="font-mono text-[10px]">{hintsLeft}</span>
+            <Lightbulb size={20} />
+            <span>{hintsLeft}</span>
           </IconBtn>
-        </div>
-      </div>
-
-      <Board
-        key={`${level.key}-${round}`}
-        pieces={pieces}
-        w={level.w}
-        h={level.h}
-        hoverId={hoverId}
-        selectedId={selectedId}
-        hintId={hintId}
-        departures={departures}
-        invalidId={invalidId}
-        shaking={shaking}
-        zoom={zoom}
-        onZoom={setZoom}
-        lang={lang}
-        onHover={setHoverId}
-        onInspect={inspect}
-        onActivate={activate}
-        onDepartureDone={finishDeparture}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
-        <p>
-          {inspectOn ? t(lang, "inspectHint") : t(lang, "gestureHint")}
-          {focusClear != null && (
-            <span className={cn("ml-2 font-medium", focusClear ? "text-ok" : "text-danger")}>
-              {focusClear ? t(lang, "clearPath") : t(lang, "blocked")}
+          <div className="dock-spacer" />
+          <div className="dock-zoom">
+            <IconBtn
+              onClick={() => setZoom((z) => Math.max(1, +(z - 0.35).toFixed(2)))}
+              label={t(lang, "zoomOut")}
+            >
+              <ZoomOut size={18} />
+            </IconBtn>
+            <IconBtn
+              onClick={() => setZoom((z) => Math.min(4, +(z + 0.35).toFixed(2)))}
+              label={t(lang, "zoomIn")}
+            >
+              <ZoomIn size={18} />
+            </IconBtn>
+          </div>
+          <IconBtn onClick={() => setZoom(1)} label={t(lang, "resetView")}>
+            <Scan size={18} />
+          </IconBtn>
+          {!isNative() && (
+            <span className="desktop-fullscreen">
+              <IconBtn
+                onClick={() => void fullscreen.toggle()}
+                label={t(lang, fullscreen.immersive ? "exitFullscreen" : "fullscreen")}
+                pressed={fullscreen.immersive}
+              >
+                {fullscreen.immersive ? <Minimize size={18} /> : <Maximize size={18} />}
+              </IconBtn>
             </span>
           )}
-        </p>
-        <div className="flex items-center gap-1">
-          <IconBtn
-            onClick={() => setZoom((z) => Math.max(1, +(z - 0.35).toFixed(2)))}
-            label={t(lang, "zoomOut")}
-          >
-            <ZoomOut className="size-3.5" />
-          </IconBtn>
-          <IconBtn
-            onClick={() => setZoom((z) => Math.min(4, +(z + 0.35).toFixed(2)))}
-            label={t(lang, "zoomIn")}
-          >
-            <ZoomIn className="size-3.5" />
-          </IconBtn>
-          <IconBtn
-            onClick={() => void fullscreen.toggle()}
-            label={t(lang, fullscreen.immersive ? "exitFullscreen" : "fullscreen")}
-            pressed={fullscreen.immersive}
-          >
-            {fullscreen.immersive ? (
-              <Minimize className="size-3.5" />
-            ) : (
-              <Maximize className="size-3.5" />
-            )}
-          </IconBtn>
-          <IconBtn onClick={() => setZoom(1)} label={t(lang, "resetView")}>
-            <Scan className="size-3.5" />
-          </IconBtn>
-          <button
-            type="button"
-            onClick={() => patch({ inspect: !inspectPref })}
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-[10px] tracking-wide uppercase",
-              inspectPref ? "border-accent/40 text-accent" : "border-border text-muted",
-            )}
-          >
-            {t(lang, "inspect")}
-          </button>
-        </div>
+        </nav>
+        <p className="play-help">{inspectPref ? t(lang, "inspectHint") : t(lang, "gestureHint")}</p>
       </div>
-
-      {ended && (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-bg/80 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-[28px] border border-border bg-surface p-6 shadow-[0_20px_80px_rgb(0_0_0/0.45)]">
-            <p
-              className={cn(
-                "font-display text-2xl font-semibold",
-                ended === "win" ? "text-ok" : "text-danger",
-              )}
-            >
-              {ended === "win" ? t(lang, "won") : t(lang, "lost")}
-            </p>
-            <p className="mt-2 text-sm text-muted">
-              {ended === "win" ? t(lang, "allClear") : t(lang, "lostHint")}
-            </p>
-            {ended === "win" && (
-              <p className="mt-3 font-mono text-xs text-faint">
-                {moves} {t(lang, "moves")} · {starsFor(mistakes, hintsUsed)} {t(lang, "stars")}
-              </p>
-            )}
-            <div className="mt-6 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={restart}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm text-fg"
-              >
-                <RotateCcw className="size-3.5" />
-                {t(lang, "retry")}
-              </button>
-              {ended === "lose" && undosLeft > 0 && session.history.length > 0 && (
-                <button
-                  type="button"
-                  onClick={undo}
-                  className="w-full rounded-full bg-accent px-4 py-2.5 text-sm text-bg"
-                >
-                  {t(lang, "undo")}
-                </button>
-              )}
-              {ended === "win" && level.id > 0 && level.id < 80 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate({ to: "/play/$levelId", params: { levelId: String(level.id + 1) } })
-                  }
-                  className="w-full rounded-full bg-fg px-4 py-2.5 text-sm font-medium text-bg"
-                >
-                  {t(lang, "next")}
-                </button>
-              )}
-              <Link
-                to={level.id > 0 ? "/levels" : "/"}
-                className="w-full rounded-full px-4 py-2.5 text-center text-sm text-muted"
-              >
-                {t(lang, "menu")}
-              </Link>
-            </div>
-          </div>
+      {notice && (
+        <div className="save-notice" role="alert">
+          <p>{notice}</p>
+          <button onClick={() => setNotice("")}>OK</button>
         </div>
+      )}
+      {settings ? (
+        <SettingsPanel onClose={() => setSettings(false)} />
+      ) : paused && !ended ? (
+        <Sheet title="Pause" onClose={resume}>
+          <p className="sheet-note">
+            {title} · {remaining} {t(lang, "arrows")}
+          </p>
+          <button className="sheet-primary" onClick={resume}>
+            {fr ? "Reprendre" : "Resume"}
+          </button>
+          <button className="sheet-secondary" onClick={restart}>
+            {fr ? "Recommencer" : "Restart"}
+          </button>
+          <button className="sheet-secondary" onClick={() => setSettings(true)}>
+            <SlidersHorizontal size={18} />
+            {fr ? "Réglages" : "Settings"}
+          </button>
+          <button className="sheet-quiet" onClick={onExit}>
+            {fr ? "Quitter vers le menu" : "Exit to menu"}
+          </button>
+        </Sheet>
+      ) : null}
+      {ended && !settings && (
+        <Sheet title={t(lang, ended === "win" ? "won" : "lost")}>
+          <p className="sheet-note">{t(lang, ended === "win" ? "allClear" : "lostHint")}</p>
+          {ended === "win" && (
+            <>
+              <div
+                className="win-stars"
+                aria-label={`${starsFor(mistakes, hintsUsed)} ${t(lang, "stars")}`}
+              >
+                {[0, 1, 2].map((i) => (
+                  <Star
+                    key={i}
+                    size={36}
+                    style={{ animationDelay: `${i * 140}ms` }}
+                    className={
+                      i < starsFor(mistakes, hintsUsed) ? "fill-accent text-accent" : "text-faint"
+                    }
+                  />
+                ))}
+              </div>
+              <p className="sheet-note">
+                {moves} {t(lang, "moves")}
+              </p>
+            </>
+          )}
+          {ended === "win" && level.id > 0 && level.id < 80 && (
+            <button
+              className="sheet-primary"
+              onClick={() =>
+                navigate({ to: "/play/$levelId", params: { levelId: String(level.id + 1) } })
+              }
+            >
+              {t(lang, "next")}
+            </button>
+          )}
+          {ended === "lose" && undosLeft > 0 && session.history.length > 0 && (
+            <button
+              className="sheet-primary"
+              onClick={() => {
+                resume();
+                undo();
+              }}
+            >
+              {t(lang, "undo")}
+            </button>
+          )}
+          <button className="sheet-secondary" onClick={restart}>
+            {t(lang, "retry")}
+          </button>
+          {ended === "win" && (
+            <button className="sheet-secondary" onClick={() => void share()}>
+              <Share2 size={18} />
+              {fr ? "Partager" : "Share"}
+            </button>
+          )}
+          <button className="sheet-quiet" onClick={onExit}>
+            {t(lang, "menu")}
+          </button>
+        </Sheet>
       )}
     </div>
   );
 }
-
 function IconBtn({
   children,
   onClick,
@@ -384,7 +522,7 @@ function IconBtn({
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-full border border-border px-2 py-1 text-muted hover:text-fg disabled:opacity-30"
+      className="game-control"
     >
       {children}
     </button>
