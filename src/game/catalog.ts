@@ -2,6 +2,7 @@ import type { LevelDef, Tier } from "./types";
 import type { GenOpts, ShapeKind } from "./generator";
 import { makeLevelFromGen } from "./generator";
 import { HANDCRAFTED } from "./handcrafted";
+import { COMPLEX_LEVELS } from "./complex-shapes";
 import bakedCampaign from "./campaign.generated.json";
 
 type Spec = {
@@ -217,7 +218,8 @@ export function getLevels(): LevelDef[] {
       generated = [];
     }
   }
-  cache = [...HANDCRAFTED, ...generated].sort((a, b) => a.id - b.id);
+  const overrides = new Map(COMPLEX_LEVELS.map(level => [level.id, level]));
+  cache = [...HANDCRAFTED, ...generated].map(level => overrides.get(level.id) ?? level).sort((a, b) => a.id - b.id);
   return cache;
 }
 

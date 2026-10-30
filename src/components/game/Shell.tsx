@@ -7,13 +7,7 @@ import { setSoundEnabled, unlockAudio } from "@/game/audio";
 import { t } from "@/game/i18n";
 import { cn } from "@/lib/cn";
 
-export function Shell({
-  children,
-  wide,
-}: {
-  children: ReactNode;
-  wide?: boolean;
-}) {
+export function Shell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const lang = useProgress((s) => s.progress.lang);
   const sound = useProgress((s) => s.progress.sound);
   const patch = useProgress((s) => s.patch);
@@ -63,6 +57,37 @@ export function Shell({
           </div>
         </header>
         <div className="flex-1">{children}</div>
+        <footer className="mt-8 border-t border-border pt-4 text-xs text-muted">
+          <p>Neon Arrow · AiXel Studio</p>
+          <details className="mt-2">
+            <summary className="cursor-pointer py-2">
+              {lang === "fr" ? "Crédits" : "Credits"}
+            </summary>
+            <p className="mt-1 leading-relaxed">
+              {lang === "fr"
+                ? "Formes et mouvement adaptés de Arrow Escape par Umang."
+                : "Shapes and movement adapted from Arrow Escape by Umang."}{" "}
+              Copyright (c) 2026 Umang ·{" "}
+              <a
+                className="text-accent underline"
+                href="/licenses/arrow-escape-MIT.txt"
+                target="_blank"
+                rel="noreferrer"
+              >
+                MIT License
+              </a>{" "}
+              ·{" "}
+              <a
+                className="text-accent underline"
+                href="https://github.com/crudeGithub/Arrow-Escape-Game-Source-Code"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Source
+              </a>
+            </p>
+          </details>
+        </footer>
       </div>
     </div>
   );

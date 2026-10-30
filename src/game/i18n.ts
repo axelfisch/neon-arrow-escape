@@ -33,6 +33,15 @@ const dict = {
   diff: { fr: "Difficulté", en: "Difficulty" },
   sound: { fr: "Son", en: "Sound" },
   inspect: { fr: "Aperçu avant tap", en: "Preview before tap" },
+  gestureHint: {
+    fr: "Tap : lancer · Maintenir : voir · Glisser : déplacer · Pincer : zoomer",
+    en: "Tap to launch · Hold to preview · Drag to pan · Pinch to zoom",
+  },
+  zoomIn: { fr: "Agrandir", en: "Zoom in" },
+  zoomOut: { fr: "Réduire", en: "Zoom out" },
+  fullscreen: { fr: "Plein écran", en: "Fullscreen" },
+  exitFullscreen: { fr: "Quitter le plein écran", en: "Exit fullscreen" },
+  resetView: { fr: "Recentrer le plateau", en: "Fit board" },
   inspectHint: {
     fr: "Premier tap : voir la trajectoire. Second tap : lancer.",
     en: "First tap previews the path. Second tap fires.",
@@ -46,16 +55,16 @@ const dict = {
     en: "It leaves if the path from the tip to the board edge is clear.",
   },
   rule3: {
-    fr: "Les formes L, U, S et spirales occupent plusieurs cases et partent d'un bloc.",
-    en: "L, U, S and spiral pieces occupy several cells and leave as one block.",
+    fr: "Les rubans se déroulent par leur pointe. Tu peux lancer plusieurs flèches à la suite.",
+    en: "Ribbons unwind from their tip. You can launch several arrows in succession.",
   },
   rule4: {
     fr: "Un tap bloqué coûte une vie. Plus de vies : échec.",
     en: "A blocked tap costs a life. No lives left: failure.",
   },
   rule5: {
-    fr: "Les défis 67 et 73 comptent 100 et 150 flèches. Le 80 est le Néant.",
-    en: "Gauntlet levels 67 and 73 hold 100 and 150 arrows. 80 is Néant.",
+    fr: "Maintiens une flèche pour voir son trajet. Glisse pour déplacer la vue et pince pour zoomer.",
+    en: "Hold an arrow to preview its path. Drag to pan and pinch to zoom.",
   },
   dailyDone: { fr: "Défi du jour réussi", en: "Daily cleared" },
   dailyPlay: { fr: "Lancer le défi", en: "Start daily" },

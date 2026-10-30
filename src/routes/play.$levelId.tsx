@@ -27,6 +27,7 @@ export function PlayPage() {
   return (
     <Shell wide>
       <PlayView
+        key={level.key}
         level={level}
         onExit={() => navigate({ to: "/levels" })}
         onWin={(stars, moves, ms) => {
@@ -41,14 +42,11 @@ export function PlayPage() {
             bestMoves: {
               ...progress.bestMoves,
               [key]:
-                progress.bestMoves[key] == null
-                  ? moves
-                  : Math.min(progress.bestMoves[key]!, moves),
+                progress.bestMoves[key] == null ? moves : Math.min(progress.bestMoves[key]!, moves),
             },
             bestTime: {
               ...progress.bestTime,
-              [key]:
-                progress.bestTime[key] == null ? ms : Math.min(progress.bestTime[key]!, ms),
+              [key]: progress.bestTime[key] == null ? ms : Math.min(progress.bestTime[key]!, ms),
             },
           });
         }}

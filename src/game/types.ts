@@ -13,6 +13,7 @@ export type Cell = { c: number; r: number };
 
 export type Piece = {
   id: string;
+  /** Ordered head to tail. The first cell is always the visible arrow tip. */
   path: Cell[];
   dir: Dir;
   color: number;
