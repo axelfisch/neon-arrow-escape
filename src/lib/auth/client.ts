@@ -2,6 +2,9 @@ import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { GROK_PROVIDERS } from "./providers";
 
+/** Fixed for the lifetime of the app; static web and iOS builds disable accounts. */
+export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
+
 /**
  * Better Auth client for this React SPA (browser-side).
  *
@@ -12,7 +15,10 @@ import { GROK_PROVIDERS } from "./providers";
  * hook attaches that token when present; when deployed (cookie auth) no token
  * is stored, so nothing changes.
  */
-export const authClient = createAuthClient({
+// Do not construct Better Auth in offline builds. Its constructor derives an
+// HTTP(S) base URL from window.location and rejects Capacitor's local scheme,
+// even if no component ever requests a session.
+export const authClient = authEnabled ? createAuthClient({
   plugins: [genericOAuthClient()],
   fetchOptions: {
     onRequest(ctx) {
@@ -21,14 +27,7 @@ export const authClient = createAuthClient({
       return ctx;
     },
   },
-});
-
-/**
- * True when sign-in UI should be shown. On by default (preview via the baked
- * preview client, deployed apps via the injected per-app client); set
- * `VITE_AUTH_ENABLED=false` to force it off (dev user — see `use-current-user`).
- */
-export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
+}) : null;
 
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };
@@ -93,6 +92,7 @@ export async function signIn(
   providerId: string,
   opts: { callbackURL?: string; errorCallbackURL?: string } = {},
 ): Promise<void> {
+  if (!authClient) throw new Error("Accounts are unavailable in this offline build");
   const callbackURL = opts.callbackURL ?? "/";
   const errorCallbackURL = opts.errorCallbackURL ?? "/";
 
@@ -202,6 +202,7 @@ function waitForPopupToken(popup: Window): Promise<string | null> {
 
 /** Sign out of THIS app's local session, clear the preview token, then redirect. */
 export async function signOut(redirectTo = "/"): Promise<void> {
+  if (!authClient) return;
   try {
     await authClient.signOut();
   } finally {

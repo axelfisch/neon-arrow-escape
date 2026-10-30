@@ -44,3 +44,19 @@ La session de contrôle actuelle ne dispose pas d’un navigateur pilotable. L�
 La grosse forme ovale blanche et bleue rapportée par Axel n’est pas diagnostiquée. Le filtre SVG décoratif et l’anneau de focus navigateur ont été retirés, la secousse globale du plateau remplacée par un signal local, mais aucune disparition ne peut être affirmée sans essai sur l’appareil concerné.
 
 La signature Apple, l’installation physique, TestFlight et la soumission App Store ne sont pas effectués. Le site Netlify public n’est pas remplacé par cette branche iOS.
+
+## Correctif de démarrage après le premier essai sur iPhone
+
+Le journal de l’iPhone a confirmé une erreur JavaScript bloquante : Better Auth
+était construit lors de l’import de `AuthSlot`, même avec `VITE_AUTH_ENABLED=false`.
+Il tentait de valider `capacitor://localhost` comme URL HTTP(S). La création du
+client est désormais conditionnée à l’activation réelle des comptes, et les
+fonctions de connexion/déconnexion traitent explicitement le mode hors ligne.
+La configuration et la signature Apple restent identiques.
+
+Validation du correctif : TypeScript et build iOS web réussis ; 62 tests existants
+réussis et 3 tests de régression supplémentaires. Ces derniers exécutent le vrai
+client Better Auth : ils reproduisent l’exception de l’ancien constructeur sous
+l’origine Capacitor, vérifient son absence en mode hors ligne et conservent le
+fonctionnement du client sur un site HTTPS avec comptes activés. L’installation
+du correctif et le nouveau démarrage sur l’iPhone restent à vérifier par Axel.
