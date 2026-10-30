@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, Lightbulb, RotateCcw, Undo2, ZoomIn, ZoomOut, Scan } from "lucide-react";
+import {
+  Heart,
+  Lightbulb,
+  RotateCcw,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
+  Scan,
+  Maximize,
+  Minimize,
+} from "lucide-react";
 import type { LevelDef } from "@/game/types";
 import { canRemove, freePieces } from "@/game/engine";
 import { createSession, moveSession, undoSession, type Session } from "@/game/session";
@@ -10,6 +20,7 @@ import { starsFor } from "@/game/save";
 import { useProgress } from "@/game/progress-store";
 import { TIER_META } from "@/game/catalog";
 import { Board, type Departure } from "./Board";
+import { useGameFullscreen } from "./useGameFullscreen";
 import { cn } from "@/lib/cn";
 
 export function PlayView({
@@ -24,6 +35,7 @@ export function PlayView({
   subtitle?: string;
 }) {
   const navigate = useNavigate();
+  const fullscreen = useGameFullscreen();
   const lang = useProgress((s) => s.progress.lang),
     inspectPref = useProgress((s) => s.progress.inspect);
   const sound = useProgress((s) => s.progress.sound),
@@ -158,7 +170,10 @@ export function PlayView({
   const tier = TIER_META[level.tier];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      ref={fullscreen.root}
+      className={cn("game-play flex flex-col gap-4", fullscreen.immersive && "is-immersive")}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono text-[10px] tracking-[0.22em] text-muted uppercase">
@@ -259,6 +274,17 @@ export function PlayView({
           >
             <ZoomIn className="size-3.5" />
           </IconBtn>
+          <IconBtn
+            onClick={() => void fullscreen.toggle()}
+            label={t(lang, fullscreen.immersive ? "exitFullscreen" : "fullscreen")}
+            pressed={fullscreen.immersive}
+          >
+            {fullscreen.immersive ? (
+              <Minimize className="size-3.5" />
+            ) : (
+              <Maximize className="size-3.5" />
+            )}
+          </IconBtn>
           <IconBtn onClick={() => setZoom(1)} label={t(lang, "resetView")}>
             <Scan className="size-3.5" />
           </IconBtn>
@@ -342,16 +368,20 @@ function IconBtn({
   onClick,
   disabled,
   label,
+  pressed,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
   label: string;
+  pressed?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
+      title={label}
+      aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
       className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-full border border-border px-2 py-1 text-muted hover:text-fg disabled:opacity-30"

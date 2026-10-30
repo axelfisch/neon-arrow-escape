@@ -4,6 +4,7 @@ import { DELTA, PIECE_COLORS } from "@/game/types";
 import { canRemove, pathPreview, pieceAt } from "@/game/engine";
 import { escapeDistance, escapeFrame, ribbonPath } from "@/game/escape";
 import { clampCamera, LONG_PRESS_MS, TAP_SLOP, zoomAt, type Camera } from "@/game/viewport";
+import { DepartureEffects } from "./DepartureEffects";
 import { cn } from "@/lib/cn";
 
 export type Departure = { piece: Piece; token: number };
@@ -53,10 +54,10 @@ const Glyph = memo(function Glyph({
         d={shape}
         fill="none"
         stroke={col}
-        strokeWidth={width + 0.16}
+        strokeWidth={width + 0.07}
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity={focus || hint ? 0.3 : free ? 0.14 : 0.06}
+        opacity={focus || hint ? 0.24 : free ? 0.12 : 0.05}
       />
       <path
         d={shape}
@@ -68,17 +69,6 @@ const Glyph = memo(function Glyph({
       />
       <circle cx={tail.c + 0.5} cy={tail.r + 0.5} r={0.055} fill={col} opacity={0.5} />
       <polygon points={arrowHead(head, piece.dir, dense ? 0.23 : 0.29)} fill={col} />
-      {(hint || focus) && (
-        <circle
-          cx={head.c + 0.5}
-          cy={head.r + 0.5}
-          r={0.43}
-          fill="none"
-          stroke={col}
-          strokeWidth={0.035}
-          opacity={0.8}
-        />
-      )}
     </g>
   );
 });
@@ -88,35 +78,43 @@ function FlyingArrow({
   w,
   h,
   onDone,
+  unit,
+  effects,
+  dense,
 }: {
   departure: Departure;
   w: number;
   h: number;
   onDone: (token: number) => void;
+  unit: number;
+  effects: boolean;
+  dense: boolean;
 }) {
-  const [distance, setDistance] = useState(0),
+  const [{ distance, age }, setFrame] = useState({ distance: 0, age: 0 }),
+    [reduced] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches),
     done = useRef(onDone);
   done.current = onDone;
   useEffect(() => {
     let frame = 0,
       start: number | null = null;
     const total = escapeDistance(departure.piece, w, h);
-    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? 80
-      : Math.min(1800, Math.max(400, total * 30));
+    const duration = reduced ? 80 : Math.min(1800, Math.max(400, total * 30));
     const tick = (now: number) => {
       start ??= now;
       const progress = Math.min(1, (now - start) / duration);
-      setDistance(total * progress);
+      setFrame({ distance: total * progress, age: now - start });
       if (progress < 1) frame = requestAnimationFrame(tick);
       else done.current(departure.token);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [departure, w, h]);
+  }, [departure, w, h, reduced]);
   return (
     <g pointerEvents="none" data-departure={departure.token}>
-      <Glyph piece={departure.piece} path={escapeFrame(departure.piece, distance)} free />
+      <Glyph piece={departure.piece} path={escapeFrame(departure.piece, distance)} dense={dense} />
+      {effects && !reduced && (
+        <DepartureEffects piece={departure.piece} distance={distance} age={age} unit={unit} />
+      )}
     </g>
   );
 }
@@ -158,6 +156,16 @@ export function Board({
 }) {
   const svg = useRef<SVGSVGElement>(null),
     [center, setCenter] = useState({ x: w / 2, y: h / 2 });
+  const [viewport, setViewport] = useState({ width: 500, height: 500 });
+  useEffect(() => {
+    const element = svg.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setViewport({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const camera = clampCamera({ ...center, zoom }, w, h),
     cameraRef = useRef(camera);
   cameraRef.current = camera;
@@ -212,7 +220,9 @@ export function Board({
     () => new Set(pieces.filter((p) => canRemove(p, pieces, w, h)).map((p) => p.id)),
     [pieces, w, h],
   );
-  const dense = pieces.length >= 60;
+  const dense = pieces.length + departures.length >= 60;
+  const effectUnit =
+    1 / Math.max(1, Math.min(viewport.width / w, viewport.height / h) * camera.zoom);
 
   return (
     <div className={cn("board-viewport", shaking && "board-shake")}>
@@ -427,12 +437,15 @@ export function Board({
             />
           </g>
         ))}
-        {departures.map((departure) => (
+        {departures.map((departure, index) => (
           <FlyingArrow
             key={departure.token}
             departure={departure}
             w={w}
             h={h}
+            unit={effectUnit}
+            effects={index >= departures.length - 8}
+            dense={dense}
             onDone={onDepartureDone}
           />
         ))}

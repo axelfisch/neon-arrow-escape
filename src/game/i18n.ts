@@ -39,6 +39,8 @@ const dict = {
   },
   zoomIn: { fr: "Agrandir", en: "Zoom in" },
   zoomOut: { fr: "Réduire", en: "Zoom out" },
+  fullscreen: { fr: "Plein écran", en: "Fullscreen" },
+  exitFullscreen: { fr: "Quitter le plein écran", en: "Exit fullscreen" },
   resetView: { fr: "Recentrer le plateau", en: "Fit board" },
   inspectHint: {
     fr: "Premier tap : voir la trajectoire. Second tap : lancer.",
